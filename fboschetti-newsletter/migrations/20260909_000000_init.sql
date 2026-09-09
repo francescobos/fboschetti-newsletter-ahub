@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS righe (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at  INTEGER NOT NULL,
+  messaggio   TEXT NOT NULL
+);

@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+
+# Runtime: dati e SQLite del plugin, mai versionati
+data/
+db/

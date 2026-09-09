@@ -1,0 +1,25 @@
+{
+  "slug": "fboschetti-newsletter",
+  "version": "0.1.0",
+  "requiresHubApi": "^1.3",
+  "displayName": "Fboschetti Newsletter",
+  "description": "Plugin Fboschetti Newsletter per Agentic Hub",
+  "jobs": [
+    {
+      "name": "fboschetti-newsletter",
+      "description": "Plugin Fboschetti Newsletter per Agentic Hub",
+      "command": "bun run scripts/fboschetti-newsletter.ts",
+      "icon": "mail",
+      "schedulable": true
+    }
+  ],
+  "instanceConfig": {
+    "templates": [
+      {
+        "source": "config/config.json.example",
+        "target": "plugins/fboschetti-newsletter/config.json",
+        "required": false
+      }
+    ]
+  }
+}
