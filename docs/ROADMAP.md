@@ -21,13 +21,14 @@ lista dei destinatari e le consegna al trasporto del core.
 
 È un ingestore e uno spedizioniere, non un authoring tool.
 
-La campagna del core vuole due corpi, `text` e `html`. L'`html` è il file
-consegnato; il `text` **lo ricava il plugin dal markdown**, spogliandolo della
-sintassi. Non è una terza proiezione da validare: è una funzione deterministica
-del `.md`, che la validazione ha già confrontato con l'`.html`.
+La campagna del core vuole due corpi, `text` e `html`, e **il plugin li riceve
+entrambi già pronti**. Non deriva, non converte, non spoglia: qualunque
+trasformazione qui dentro reintrodurrebbe proprio il rischio — testo mutilato,
+sintassi residua, link persi — che la consegna di file pronti elimina. Ciò che
+parte è, byte per byte, ciò che l'agente dei contenuti ha consegnato.
 
 ```text
-agente contenuti ──► .md + .html ──► [ plugin ] ──► campagna del core ──► Resend
+agente contenuti ──► .txt + .html ──► [ plugin ] ──► campagna del core ──► Resend
                                         │
                                    lista contatti
 ```
@@ -46,15 +47,16 @@ isolamento fra plugin. Le fasi 4 e 5 della mappa — HTML e liste vere — **non
 sono più bloccate**: il vincolo «solo testo, cerchia ristretta» descriveva un
 core che oggi non è più quello.
 
-**Il contenuto arriva da fuori.** Markdown *e* HTML impaginato sono prodotti da
-un altro agente, quello dei contenuti. Cade quindi dal perimetro del plugin sia
-il guscio di marca sia il convertitore markdown → HTML, che la mappa
-collocava qui.
+**Il contenuto arriva da fuori, in entrambe le forme.** L'agente dei contenuti
+consegna il testo *e* l'HTML impaginato, già nella forma in cui partiranno. Cade
+quindi dal perimetro del plugin tutto ciò che la mappa collocava qui: il guscio
+di marca, il convertitore markdown → HTML, e la derivazione della versione
+testuale.
 
 Con una conseguenza da assumere consapevolmente: la mappa garantiva che HTML e
-TXT non divergessero facendoli derivare dallo stesso sorgente. Arrivando come
-file separati, quella garanzia sparisce. La sostituisce la **validazione in
-ingresso** (fasi 2 e 3), che è la ragione per cui esiste.
+testo non divergessero facendoli derivare dallo stesso sorgente. Arrivando come
+file separati e indipendenti, quella garanzia sparisce. La sostituisce la
+**validazione in ingresso** (fasi 2 e 3), che è la sola ragione per cui esiste.
 
 ---
 
@@ -78,7 +80,7 @@ bozza ──► validata_tech ──► validata_semantica ──► pronta ─�
 | `bozza` | File importati, nessun controllo superato |
 | `validata_tech` | Controllo deterministico superato |
 | `errore_tech` | Controllo deterministico fallito, con rapporto |
-| `validata_semantica` | Il modello locale conferma che `.md` e `.html` dicono la stessa cosa |
+| `validata_semantica` | Il modello locale conferma che testo e HTML dicono la stessa cosa |
 | `errore_semantica` | Il modello rileva divergenza, con rapporto |
 | `pronta` | Soggetto e destinatari risolti, `ref` calcolato: accodabile |
 | `in_invio` | Campagna accodata e avviata nel core |
@@ -133,21 +135,27 @@ qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
 **Obiettivo**: un'edizione entra nel plugin e arriva a `validata_tech`.
 
 - Schema dell'edizione e macchina a stati.
-- Import della coppia `.md` + `.html` da una directory, con i metadati del
-  numero.
-- Validatore deterministico: HTML ben formato, testo estraibile, confronto
-  strutturale fra le due proiezioni (lunghezze, titoli, numero di paragrafi,
-  link), indirizzi e URL sani.
-- Anteprima delle due proiezioni nella UI.
+- Import della coppia `.txt` + `.html` da una directory, con i metadati del
+  numero. Entrambi i file sono obbligatori: una coppia incompleta non entra.
+- Validatore deterministico: HTML ben formato, testo non vuoto, confronto
+  strutturale fra le due proiezioni — si estrae il testo dall'HTML *ai soli fini
+  del confronto*, e lo si mette a paragone col `.txt` consegnato (lunghezze,
+  titoli, numero di paragrafi, link). Indirizzi e URL sani.
+- Anteprima di entrambe le proiezioni nella UI.
 - Rapporto di validazione leggibile, salvato con l'edizione.
 
 **Perché deterministico prima di semantico**: è veloce, non costa nulla, non
 richiede LM Studio acceso, e da solo intercetta gli errori di caricamento più
-grossolani — file scambiati, HTML troncato, coppia disallineata. Il modello
-serve per ciò che questo controllo non vede.
+grossolani — file scambiati, HTML troncato, coppia disallineata, `.txt` rimasto
+a un'edizione precedente. Il modello serve per ciò che questo controllo non
+vede.
 
-**Fatto quando**: due file coerenti passano; rompendone uno l'edizione si ferma
-in `errore_tech` con un rapporto che dice cosa non torna.
+**Una distinzione da non perdere**: il testo estratto dall'HTML serve *solo* a
+confrontare. Non finisce mai nella campagna, che riceve il `.txt` consegnato.
+
+**Fatto quando**: una coppia coerente passa; sostituendo il `.txt` con quello di
+un altro numero, o troncando l'HTML, l'edizione si ferma in `errore_tech` con un
+rapporto che dice cosa non torna.
 
 ---
 
@@ -155,7 +163,7 @@ in `errore_tech` con un rapporto che dice cosa non torna.
 
 **Obiettivo**: da `validata_tech` a `validata_semantica`.
 
-- Prompt di confronto fra il testo del `.md` e il testo estratto dall'`.html`.
+- Prompt di confronto fra il `.txt` consegnato e il testo estratto dall'`.html`.
 - Parsing dell'esito in un verdetto strutturato con motivazione.
 - Comportamento quando LM Studio non è configurato o è spento: l'edizione non
   avanza, e il motivo è chiaro. L'assenza del modello non è un passaggio
@@ -218,7 +226,7 @@ aprire i log del core.
 
 | Cosa | Dove vive | Quando |
 | :--- | :--- | :--- |
-| Guscio di marca, resa markdown → HTML | Agente dei contenuti | Non è di questo plugin |
+| Guscio di marca, resa HTML, versione testuale | Agente dei contenuti | Non è di questo plugin |
 | Disiscrizione con link e token opachi | Fase 6 della mappa | Dipende dal Ponte (Progetto 3) |
 | Rimbalzi e segnalazioni | Fase 7 della mappa | Dipende dal Ponte e da Core Fase 3 |
 | Più liste esplicite | — | Una lista sola più tag copre i casi reali |
