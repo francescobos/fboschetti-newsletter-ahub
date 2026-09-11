@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Piano di Lavoro</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font: 11px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #222; margin: 12px; background: #fff; }
+  h1 { font-size: 16px; margin: 0 0 2px; }
+  .sub { color: #666; margin: 0 0 10px; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  th, td { border: 1px solid #ccc; padding: 2px 4px; vertical-align: middle; }
+  thead th { background: #f2f2f2; font-weight: 600; text-align: center; font-size: 10px; }
+  thead tr.mesi th { font-size: 11px; }
+  col.c-fase { width: 78px; } col.c-task { width: 230px; } col.c-chi { width: 62px; } col.c-date { width: 84px; }
+  td.task { line-height: 1.2; }
+  td.date { font-size: 10px; color: #555; white-space: nowrap; }
+  td.w { padding: 0; height: 18px; }
+  td.w.on { background: var(--c); border-left: 0; border-right: 0; }
+  td.w.on.start { border-left: 1px solid #ccc; } td.w.on.end { border-right: 1px solid #ccc; }
+  td.w.oggi, th.oggi { box-shadow: inset 3px 0 0 #d00; }
+  th.oggi { color: #d00; }
+  tr.fase-sep td { border-top: 2px solid #999; }
+  td.fase { font-weight: 600; color: var(--c-dark); }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  thead { display: table-header-group; }
+  .legenda { margin-top: 8px; color: #666; font-size: 10px; }
+  .err { color: #b00; font-weight: 600; }
+  @media print { body { margin: 0; } .noprint { display: none; } }
+</style>
+</head>
+<body>
+<h1 id="titolo">Piano di lavoro</h1>
+<p class="sub" id="sub"></p>
+<div id="out"></div>
+<p class="legenda noprint">Colonne = settimane (lunedì). Linea rossa = settimana corrente. Per modificare: <code>piano-dati.js</code>, poi ricarica e stampa (orizzontale).</p>
+<script src="piano-dati.js"></script>
+<script>
+(function () {
+  if (typeof TITOLO_PIANO !== 'undefined' && TITOLO_PIANO) {
+    document.title = TITOLO_PIANO;
+    const h1 = document.getElementById('titolo');
+    if (h1) h1.textContent = TITOLO_PIANO;
+  }
+
+  const PALETTE = ['#cfe2f3','#d9ead3','#fce5cd','#fff2cc','#ead1dc','#d0e0e3','#e6d8f2','#f4cccc'];
+  const DARK    = ['#1f4e79','#38761d','#b45f06','#7f6000','#741b47','#134f5c','#4a2a7a','#990000'];
+  const MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const d = s => { const [y,m,g] = s.trim().split('-').map(Number); return new Date(y, m-1, g); };
+  const fmt = x => String(x.getDate()).padStart(2,'0') + '/' + String(x.getMonth()+1).padStart(2,'0');
+  const monday = x => { const r = new Date(x); r.setDate(r.getDate() - ((r.getDay()+6)%7)); r.setHours(0,0,0,0); return r; };
+  const addD = (x,n) => { const r = new Date(x); r.setDate(r.getDate()+n); return r; };
+
+  const rows = [], errs = [];
+  PIANO.split('\n').forEach((line, i) => {
+    const t = line.trim(); if (!t || t.startsWith('#')) return;
+    const p = t.split('|').map(s => s.trim());
+    if (p.length < 4 || !/^\d{4}-\d{2}-\d{2}$/.test(p[2]) || !/^\d{4}-\d{2}-\d{2}$/.test(p[3])) { errs.push('riga ' + (i+1) + ': ' + t); return; }
+    rows.push({ fase: p[0], task: p[1], da: d(p[2]), a: d(p[3]), chi: p[4] || '' });
+  });
+  const out = document.getElementById('out');
+  if (errs.length) out.innerHTML = '<p class="err">Righe non lette in piano-dati.js:<br>' + errs.join('<br>') + '</p>';
+  if (!rows.length) return;
+
+  const fasi = []; rows.forEach(r => { if (!fasi.includes(r.fase)) fasi.push(r.fase); });
+  const col = f => PALETTE[fasi.indexOf(f) % PALETTE.length], dark = f => DARK[fasi.indexOf(f) % DARK.length];
+  const min = monday(new Date(Math.min(...rows.map(r => r.da)))), max = new Date(Math.max(...rows.map(r => r.a)));
+  const weeks = []; for (let w = min; w <= max; w = addD(w,7)) weeks.push(w);
+  const oggi = monday(new Date());
+  document.getElementById('sub').textContent = 'Dal ' + fmt(min) + ' al ' + fmt(max) + ' · stampato il ' + fmt(new Date()) + '/' + new Date().getFullYear();
+
+  let h = '<table><colgroup><col class="c-fase"><col class="c-task"><col class="c-chi"><col class="c-date">' + weeks.map(() => '<col>').join('') + '</colgroup><thead>';
+  h += '<tr class="mesi"><th colspan="4"></th>';
+  let i = 0; while (i < weeks.length) { const m = weeks[i].getMonth(), y = weeks[i].getFullYear(); let n = 0; while (i+n < weeks.length && weeks[i+n].getMonth() === m) n++; h += '<th colspan="' + n + '">' + MESI[m] + ' ' + y + '</th>'; i += n; }
+  h += '</tr><tr><th>Fase</th><th>Task</th><th>Chi</th><th>Date</th>' + weeks.map(w => '<th class="' + (+w === +oggi ? 'oggi' : '') + '">' + fmt(w) + '</th>').join('') + '</tr></thead><tbody>';
+  let prev = null;
+  rows.forEach(r => {
+    const first = r.fase !== prev; prev = r.fase;
+    h += '<tr class="' + (first ? 'fase-sep' : '') + '" style="--c:' + col(r.fase) + ';--c-dark:' + dark(r.fase) + '">';
+    h += '<td class="fase">' + (first ? r.fase : '') + '</td><td class="task" title="' + r.task + '">' + r.task + '</td><td>' + r.chi + '</td>';
+    h += '<td class="date">' + (+r.da === +r.a ? fmt(r.da) : fmt(r.da) + ' → ' + fmt(r.a)) + '</td>';
+    weeks.forEach(w => {
+      const on = r.a >= w && r.da < addD(w,7);
+      const cls = ['w', on ? 'on' : '', on && r.da >= w ? 'start' : '', on && r.a < addD(w,7) ? 'end' : '', +w === +oggi ? 'oggi' : ''].filter(Boolean).join(' ');
+      h += '<td class="' + cls + '"></td>';
+    });
+    h += '</tr>';
+  });
+  out.innerHTML += h + '</tbody></table>';
+})();
+</script>
+</body>
+</html>

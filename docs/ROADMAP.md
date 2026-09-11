@@ -222,6 +222,18 @@ aprire i log del core.
 
 ---
 
+## Fase 6 — Comunicazione e Outreach
+
+**Obiettivo**: raccontare l'architettura del plugin, divulgarne l'affidabilità e aprire l'opportunità di servizio di outreach e newsletter gestite oltre il perimetro pilota dei villaggi.
+
+- **Piano e calendario editoriale**: serie di 4 post diluiti nel tempo (LinkedIn / canali professionali) su architettura, validazione semantica locale LM Studio, apertura del servizio a PMI/B2B e metriche reali.
+- **Articolo cardine di approfondimento**: testo long-form che descrive il plugin, l'integrazione con Agentic Hub, la separazione dei ruoli (authoring vs validazione vs trasporto) e come questo stack rende scalabile e sicuro il servizio di newsletter per altri settori.
+- Dettaglio completo e scaletta in [docs/CALENDARIO-EDITORIALE.md](file:///Users/fboschetti/Repo/fboschetti/fboschetti-newsletter-ahub/docs/CALENDARIO-EDITORIALE.md).
+
+**Fatto quando**: piano e articolo cardine sono redatti e la sequenza temporale è schedulata nel cronoprogramma generale.
+
+---
+
 ## Fuori perimetro
 
 | Cosa | Dove vive | Quando |
