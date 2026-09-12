@@ -1,0 +1,4 @@
+email,nome,cognome,azienda,ruolo,tag,provenienza,indirizzo_raw
+mario.rossi@esempio.it,Mario,Rossi,Villaggio Sole,Direttore,"villaggi,pilota",export-2026,"Via Zenzalino Nord 145, 40054 Budrio (BO)"
+lucia.bianchi@esempio.it,Lucia,Bianchi,Villaggio Sole,Marketing,villaggi,export-2026,
+anna.verdi@esempio.it,Anna,Verdi,,,"pilota",contatto-diretto,"Via Emilia 12, 40100 Bologna (BO)"
