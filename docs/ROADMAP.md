@@ -104,11 +104,28 @@ Tre regole che valgono per tutte le fasi:
 
 **Obiettivo**: la lista esiste, si popola, si cura.
 
-- Schema del contatto: indirizzo, nome, `iscritto`, stato tecnico, tag,
-  provenienza, timestamp, `disiscritto_il`, `disiscritto_via`.
-- Import da CSV, idempotente sull'indirizzo.
+- Schema del contatto: `email`, nome, cognome, azienda, ruolo, indirizzo
+  fisico, `iscritto`, stato tecnico, tag, provenienza, timestamp,
+  `disiscritto_il`, `disiscritto_via`.
+- Anagrafica delle aziende in tabella propria, collegata al contatto.
+- Import da CSV, idempotente sull'email.
 - CRUD e cura dalla UI: aggiunta manuale, modifica, disiscrizione.
 - Pagina del plugin che mostra e filtra la lista.
+
+**Non è solo la lista dei destinatari, è l'anagrafica.** I contatti che entrano
+qui sono in larga parte prospect, e su un prospect servono cose che a un
+destinatario non servono: l'azienda, il ruolo, un indirizzo per organizzare
+visite in zona. L'iscrizione alla newsletter è uno degli attributi, non la
+ragione della tabella.
+
+L'azienda ha riga propria non perché servano più contatti per azienda — caso
+raro — ma perché è il posto dove appendere ciò che si sa di lei: settore, sito,
+note, esiti di analisi. Il costo di questa scelta è tutto ora, con la lista
+vuota; farla dopo significherebbe deduplicare a mano centinaia di ragioni
+sociali. L'indirizzo si conserva anche grezzo, com'è stato incollato: la
+Fase 6 lo scomporrà.
+
+Spec completa: [superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md](superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md).
 
 **Due assi distinti, non uno.** `iscritto` è la volontà della persona; lo stato
 tecnico è la salute dell'indirizzo (mai verificato, rimbalzato). Un indirizzo
@@ -123,7 +140,8 @@ deliberata.
 
 Per la stessa ragione un contatto disiscritto **non si cancella**: cancellarlo
 lo espone al reimport. `disiscritto_via` (`telefono`, `email`, `manuale`,
-in futuro `ponte`) nasce ora perché la fase 6 lo troverà pronto.
+in futuro `ponte`) nasce ora perché la fase che gestirà i rimbalzi lo troverà
+pronto.
 
 **Fatto quando**: importi un CSV, vedi i contatti, li modifichi, disiscrivi
 qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
@@ -222,7 +240,37 @@ aprire i log del core.
 
 ---
 
-## Fase 6 — Comunicazione e Outreach
+## Fase 6 — Indirizzi scomposti e ricerca per zona
+
+**Obiettivo**: da un indirizzo incollato a un indirizzo interrogabile.
+
+- Parser che, dato `indirizzo_raw` scritto in qualunque forma — *«Via Zenzalino
+  Nord, 145 Budrio 40054 (BO)»* — ne ricava via, comune, provincia, regione e
+  CAP.
+- Ciò che il parser non capisce **non lo inventa**: lo segna come ambiguo e lo
+  mette in revisione. Un indirizzo sbagliato in silenzio è peggio di un
+  indirizzo mancante.
+- Geocodifica in `lat`/`lon`, e ricerca per raggio: *«tutti i prospect entro
+  40 km»*.
+- Filtri per comune, provincia e regione nella pagina dei contatti.
+
+**Perché è una fase e non un dettaglio dell'import**: interpretare un indirizzo
+scritto a mano è lo stesso problema della Fase 3 — un compito che il modello
+locale fa bene e che una regex fa male. Ha bisogno di un suo stato di revisione
+e di una sua verifica.
+
+**Perché viene prima dell'outreach**: organizzare visite in zona presuppone
+indirizzi interrogabili. `indirizzo_raw` resta sempre conservato e non viene
+mai riscritto, così il parser si può rilanciare su tutta la tabella senza aver
+perso gli originali.
+
+**Fatto quando**: una rubrica di indirizzi incollati produce comuni e province
+corrette, gli incerti sono in una lista da rivedere, e la ricerca per raggio
+restituisce i contatti giusti.
+
+---
+
+## Fase 7 — Comunicazione e Outreach
 
 **Obiettivo**: raccontare l'architettura del plugin, divulgarne l'affidabilità e aprire l'opportunità di servizio di outreach e newsletter gestite oltre il perimetro pilota dei villaggi.
 
