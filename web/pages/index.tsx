@@ -146,7 +146,7 @@ export default function PaginaContatti() {
           <input
             type="file"
             accept=".csv,text/csv"
-            className="hidden"
+            className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void scegliFile(f);
