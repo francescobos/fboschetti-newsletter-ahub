@@ -16,6 +16,7 @@ import {
   type FiltriContatti,
   type StatoTecnico,
 } from "./contatti";
+import { emailValida, normalizzaEmail } from "./csv";
 import { importaCsv, storicoImport } from "./import";
 
 /**
@@ -58,8 +59,10 @@ export default function createRoutes(deps: {
       filtri.statoTecnico = q.stato_tecnico as StatoTecnico;
     }
     if (q.provincia) filtri.provincia = q.provincia;
-    if (q.limite) filtri.limite = Number(q.limite);
-    if (q.offset) filtri.offset = Number(q.offset);
+    const limite = Number(q.limite);
+    if (Number.isFinite(limite) && limite > 0) filtri.limite = limite;
+    const offset = Number(q.offset);
+    if (Number.isFinite(offset) && offset >= 0) filtri.offset = offset;
     return c.json(elencaContatti(db, filtri));
   });
 
@@ -68,6 +71,9 @@ export default function createRoutes(deps: {
       .json<Partial<DatiContatto>>()
       .catch(() => ({}));
     if (!body.email) return c.json({ errore: "email_mancante" }, 400);
+    if (!emailValida(normalizzaEmail(body.email))) {
+      return c.json({ errore: "email_non_valida" }, 400);
+    }
     try {
       return c.json({ id: creaContatto(db, body as DatiContatto) }, 201);
     } catch {
@@ -81,6 +87,9 @@ export default function createRoutes(deps: {
     const body: Partial<DatiContatto> = await c.req
       .json<Partial<DatiContatto>>()
       .catch(() => ({}));
+    if (body.statoTecnico && !STATI_VALIDI.includes(body.statoTecnico as StatoTecnico)) {
+      return c.json({ errore: "stato_tecnico_non_valido", attesi: STATI_VALIDI }, 400);
+    }
     aggiornaContatto(db, id, body);
     return c.json({ ok: true });
   });
