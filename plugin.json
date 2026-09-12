@@ -11,6 +11,13 @@
       "command": "bun run scripts/fboschetti-newsletter.ts",
       "icon": "mail",
       "schedulable": true
+    },
+    {
+      "name": "import-contatti",
+      "description": "Importa un CSV nella lista contatti",
+      "command": "bun run scripts/import-contatti.ts",
+      "icon": "mail",
+      "schedulable": false
     }
   ],
   "instanceConfig": {
