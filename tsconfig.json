@@ -10,5 +10,5 @@
     "isolatedModules": true,
     "jsx": "react-jsx"
   },
-  "include": ["scripts/**/*", "server/**/*", "tests/**/*", "web/**/*"]
+  "include": ["scripts/**/*", "server/**/*", "tests/**/*"]
 }
