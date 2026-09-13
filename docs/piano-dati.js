@@ -25,9 +25,14 @@ Fase 1: Contatti | Import CSV idempotente su indirizzo | 2026-09-12 | 2026-09-12
 Fase 1: Contatti | CRUD, stato tecnico e logica disiscrizione | 2026-09-13 | 2026-09-13 | Francesco | fatto
 Fase 1: Contatti | UI pagina plugin con tabella e filtri | 2026-09-13 | 2026-09-13 | Francesco | fatto
 
+# ---------- Fase 1.5 — Campagna diretta nel Core ----------
+Fase 1.5: Outreach | Risoluzione destinatari attivi da DB contatti | 2026-09-14 | 2026-09-14 | Francesco
+Fase 1.5: Outreach | Integrazione deps.mail per enqueueCampaign e startCampaign | 2026-09-15 | 2026-09-15 | Francesco
+Fase 1.5: Outreach | Superficie operativa invio (route/CLI) e verifica stato | 2026-09-16 | 2026-09-16 | Francesco
+
 # ---------- Fase 2 — Ingestione e validazione tecnica ----------
-Fase 2: Tech | Schema edizione e macchina a stati | 2026-09-14 | 2026-09-17 | Francesco
-Fase 2: Tech | Ingestione coppia .txt + .html e metadati | 2026-09-18 | 2026-09-22 | Francesco
+Fase 2: Tech | Schema edizione e macchina a stati | 2026-09-17 | 2026-09-21 | Francesco
+Fase 2: Tech | Ingestione coppia .txt + .html e metadati | 2026-09-22 | 2026-09-25 | Francesco
 Fase 2: Tech | Validatore deterministico strutturale | 2026-09-23 | 2026-09-28 | Francesco
 Fase 2: Tech | UI anteprima proiezioni e report validazione | 2026-09-29 | 2026-10-02 | Francesco
 

@@ -151,6 +151,26 @@ qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
 
 ---
 
+## Fase 1.5 — Campagna diretta nel Core (Invio e Outreach anticipato)
+
+**Obiettivo**: iniziare a scrivere ai contatti e fare outreach subito, creando e avviando una campagna gestita direttamente dal trasporto del core, prima di completare l'ingestione formale e le validazioni (Fasi 2 e 3).
+
+- Risoluzione dei destinatari dal database contatti (`iscritto = 1` e `stato_tecnico != 'rimbalzato'`), con possibilità di filtrare per tag o testare su singolo indirizzo/admin.
+- Accodamento della campagna nel core via `deps.mail.enqueueCampaign` fornendo:
+  - `ref` univoco e deterministico (es. `newsletter-outreach-YYYY-MM` o indicato dall'utente), a tutela contro doppi invii.
+  - Oggetto della comunicazione.
+  - Coppia di corpi: versione testuale (`text`) e versione formattata (`html`).
+  - Destinatari estratti dal DB.
+- Avvio immediato della campagna nel core via `deps.mail.startCampaign(id)`, lasciando al core il ritmo di scarico (10 mail ogni 4 secondi), la ripresa automatica dopo eventuale riavvio e l'idempotenza.
+- Consultazione dello stato e contatori dal core tramite `deps.mail.getCampaign(ref)`.
+- Superficie operativa snella: route API dedicata (ed eventuale comando/script o form minimale) che consente di caricare i contenuti e avviare la campagna senza dipendere dal ciclo completo di ingestione.
+
+**Perché adesso**: permette di iniziare immediatamente a coltivare i prospect e le relazioni reali mentre il lavoro architetturale sul plugin prosegue. Poiché è il core a governare il volume, la coda e i retry, non c'è rischio di violare limiti del provider né di causare disservizi.
+
+**Fatto quando**: a partire da una coppia `.txt` + `.html` e un oggetto, viene creata e avviata con successo una campagna nel core per i contatti iscritti, e il core restituisce lo stato di avanzamento.
+
+---
+
 ## Fase 2 — Ingestione dell'edizione e validazione tecnica
 
 **Obiettivo**: un'edizione entra nel plugin e arriva a `validata_tech`.
