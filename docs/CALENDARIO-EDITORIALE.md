@@ -20,7 +20,7 @@ Tuttavia, l'architettura scelta trasforma questo plugin in qualcosa di molto pi�
 
 ## 2. Articolo Cardine (Long-form / Blog / LinkedIn Article)
 
-- **Finestra temporale**: 16 – 19 Dicembre 2026
+- **Finestra temporale**: 25 – 28 Novembre 2026
 - **Titolo di lavoro**:  
   *«Costruire un'infrastruttura di newsletter con Agentic Hub: separazione dei ruoli, validazione semantica locale e perché apre un nuovo modello di outreach per le PMI»*
 - **Target**: Sviluppatori, tech lead, consulenti di digital marketing, titolari di PMI e direttori marketing.
@@ -49,10 +49,10 @@ La pubblicazione dell'articolo cardine è accompagnata e seguita da una sequenza
 
 | Data prevista | Tema del Post | Formato / Hook | Messaggio chiave |
 | :--- | :--- | :--- | :--- |
-| **21 – 23 Dic 2026** | **Post 1 — L'architettura e la separazione dei ruoli** | Carosello / Screenshot architettura | Perché un plugin di newsletter non deve fare l'autore dei contenuti né riscrivere il trasporto email. La separazione concettuale in Agentic Hub. |
-| **28 – 30 Dic 2026** | **Post 2 — Validazione semantica locale anti-allucinazione** | Post tecnico + schema LM Studio | Come usare un modello locale (LM Studio) offline-safe come cancello invalicabile tra bozza e spedizione reale. Nessuna mail parte se il guardrail non dà semaforo verde. |
-| **04 – 07 Gen 2027** | **Post 3 — Apertura outreach oltre i villaggi (B2B & PMI)** | Storytelling di business / Opportunità | Dal banco di prova dei villaggi turistici all'offerta di newsletter & outreach gestita per altri verticali. Come l'automazione agentica affidabile abbatte i costi e alza la qualità per aziende e professionisti. |
-| **11 – 14 Gen 2027** | **Post 4 — Metriche sul campo e newsletter-as-a-service** | Post di sintesi / Dati reali | I risultati dei primi invii in produzione: zero divergenze, gestione automatica dei rimbalzi, feedback degli utenti. Call to action per chi desidera attivare il servizio. |
+| **30 Nov – 02 Dic 2026** | **Post 1 — L'architettura e la separazione dei ruoli** | Carosello / Screenshot architettura | Perché un plugin di newsletter non deve fare l'autore dei contenuti né riscrivere il trasporto email. La separazione concettuale in Agentic Hub. |
+| **07 – 09 Dic 2026** | **Post 2 — Validazione semantica locale anti-allucinazione** | Post tecnico + schema LM Studio | Come usare un modello locale (LM Studio) offline-safe come cancello invalicabile tra bozza e spedizione reale. Nessuna mail parte se il guardrail non dà semaforo verde. |
+| **14 – 17 Dic 2026** | **Post 3 — Apertura outreach oltre i villaggi (B2B & PMI)** | Storytelling di business / Opportunità | Dal banco di prova dei villaggi turistici all'offerta di newsletter & outreach gestita per altri verticali. Come l'automazione agentica affidabile abbatte i costi e alza la qualità per aziende e professionisti. |
+| **21 – 24 Dic 2026** | **Post 4 — Metriche sul campo e newsletter-as-a-service** | Post di sintesi / Dati reali | I risultati dei primi invii in produzione: zero divergenze, gestione automatica dei rimbalzi, feedback degli utenti. Call to action per chi desidera attivare il servizio. |
 
 ---
 

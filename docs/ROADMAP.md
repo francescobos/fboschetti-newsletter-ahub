@@ -100,17 +100,18 @@ Tre regole che valgono per tutte le fasi:
 
 ---
 
-## Fase 1 — Lista contatti
+## Fase 1 — Lista contatti ✅ (Completata)
 
+**Stato**: completata (2026-09-13)  
 **Obiettivo**: la lista esiste, si popola, si cura.
 
-- Schema del contatto: `email`, nome, cognome, azienda, ruolo, indirizzo
+- [x] Schema del contatto: `email`, nome, cognome, azienda, ruolo, indirizzo
   fisico, `iscritto`, stato tecnico, tag, provenienza, timestamp,
   `disiscritto_il`, `disiscritto_via`.
-- Anagrafica delle aziende in tabella propria, collegata al contatto.
-- Import da CSV, idempotente sull'email.
-- CRUD e cura dalla UI: aggiunta manuale, modifica, disiscrizione.
-- Pagina del plugin che mostra e filtra la lista.
+- [x] Anagrafica delle aziende in tabella propria, collegata al contatto.
+- [x] Import da CSV, idempotente sull'email.
+- [x] CRUD e cura dalla UI: aggiunta manuale, modifica, disiscrizione.
+- [x] Pagina del plugin che mostra e filtra la lista.
 
 **Non è solo la lista dei destinatari, è l'anagrafica.** I contatti che entrano
 qui sono in larga parte prospect, e su un prospect servono cose che a un
@@ -125,7 +126,8 @@ vuota; farla dopo significherebbe deduplicare a mano centinaia di ragioni
 sociali. L'indirizzo si conserva anche grezzo, com'è stato incollato: la
 Fase 6 lo scomporrà.
 
-Spec completa: [superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md](superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md).
+Spec completa: [superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md](superpowers/specs/2026-09-12-fase-1-lista-contatti-design.md).  
+Piano di implementazione: [superpowers/plans/2026-09-12-fase-1-lista-contatti.md](superpowers/plans/2026-09-12-fase-1-lista-contatti.md).
 
 **Due assi distinti, non uno.** `iscritto` è la volontà della persona; lo stato
 tecnico è la salute dell'indirizzo (mai verificato, rimbalzato). Un indirizzo
@@ -144,7 +146,8 @@ in futuro `ponte`) nasce ora perché la fase che gestirà i rimbalzi lo troverà
 pronto.
 
 **Fatto quando**: importi un CSV, vedi i contatti, li modifichi, disiscrivi
-qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
+qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.  
+**Esito**: completata e verificata (test automatizzati `bun test` e integrazione UI).
 
 ---
 

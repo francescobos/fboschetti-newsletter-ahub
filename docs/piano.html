@@ -21,6 +21,26 @@
   td.w.on.start { border-left: 1px solid #ccc; } td.w.on.end { border-right: 1px solid #ccc; }
   td.w.oggi, th.oggi { box-shadow: inset 3px 0 0 #d00; }
   th.oggi { color: #d00; }
+  td.w.on.done {
+    background-color: var(--c);
+    background-image: repeating-linear-gradient(45deg, rgba(46, 125, 50, 0.35), rgba(46, 125, 50, 0.35) 4px, var(--c) 4px, var(--c) 8px);
+    box-shadow: inset 0 0 0 1px rgba(46, 125, 50, 0.6);
+  }
+  td.w.on.done.start { border-left: 2px solid #2e7d32; }
+  td.w.on.done.end { border-right: 2px solid #2e7d32; }
+  .badge-done {
+    display: inline-block;
+    background: #2e7d32;
+    color: #fff;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 0 3px;
+    margin-right: 4px;
+    line-height: 1.3;
+    vertical-align: 1px;
+  }
+  tr.task-done td.task { color: #333; }
   tr.fase-sep td { border-top: 2px solid #999; }
   td.fase { font-weight: 600; color: var(--c-dark); }
   tr { page-break-inside: avoid; break-inside: avoid; }
@@ -34,7 +54,7 @@
 <h1 id="titolo">Piano di lavoro</h1>
 <p class="sub" id="sub"></p>
 <div id="out"></div>
-<p class="legenda noprint">Colonne = settimane (lunedì). Linea rossa = settimana corrente. Per modificare: <code>piano-dati.js</code>, poi ricarica e stampa (orizzontale).</p>
+<p class="legenda noprint">Colonne = settimane (lunedì). Linea rossa = settimana corrente. Barra tratteggiata/badge verde = task completato. Per modificare: <code>piano-dati.js</code>, poi ricarica e stampa (orizzontale).</p>
 <script src="piano-dati.js"></script>
 <script>
 (function () {
@@ -57,7 +77,9 @@
     const t = line.trim(); if (!t || t.startsWith('#')) return;
     const p = t.split('|').map(s => s.trim());
     if (p.length < 4 || !/^\d{4}-\d{2}-\d{2}$/.test(p[2]) || !/^\d{4}-\d{2}-\d{2}$/.test(p[3])) { errs.push('riga ' + (i+1) + ': ' + t); return; }
-    rows.push({ fase: p[0], task: p[1], da: d(p[2]), a: d(p[3]), chi: p[4] || '' });
+    const done = (p[5] && /^(fatto|done|completato)$/i.test(p[5])) || /^(\u2713|\[x\]|✓)/i.test(p[1]);
+    const cleanTask = p[1].replace(/^(\u2713|\[x\]|✓)\s*/, '');
+    rows.push({ fase: p[0], task: cleanTask, da: d(p[2]), a: d(p[3]), chi: p[4] || '', done });
   });
   const out = document.getElementById('out');
   if (errs.length) out.innerHTML = '<p class="err">Righe non lette in piano-dati.js:<br>' + errs.join('<br>') + '</p>';
@@ -77,12 +99,14 @@
   let prev = null;
   rows.forEach(r => {
     const first = r.fase !== prev; prev = r.fase;
-    h += '<tr class="' + (first ? 'fase-sep' : '') + '" style="--c:' + col(r.fase) + ';--c-dark:' + dark(r.fase) + '">';
-    h += '<td class="fase">' + (first ? r.fase : '') + '</td><td class="task" title="' + r.task + '">' + r.task + '</td><td>' + r.chi + '</td>';
+    const trClass = [first ? 'fase-sep' : '', r.done ? 'task-done' : ''].filter(Boolean).join(' ');
+    h += '<tr class="' + trClass + '" style="--c:' + col(r.fase) + ';--c-dark:' + dark(r.fase) + '">';
+    const taskContent = (r.done ? '<span class="badge-done" title="Completato">✓</span>' : '') + r.task;
+    h += '<td class="fase">' + (first ? r.fase : '') + '</td><td class="task" title="' + r.task + '">' + taskContent + '</td><td>' + r.chi + '</td>';
     h += '<td class="date">' + (+r.da === +r.a ? fmt(r.da) : fmt(r.da) + ' → ' + fmt(r.a)) + '</td>';
     weeks.forEach(w => {
       const on = r.a >= w && r.da < addD(w,7);
-      const cls = ['w', on ? 'on' : '', on && r.da >= w ? 'start' : '', on && r.a < addD(w,7) ? 'end' : '', +w === +oggi ? 'oggi' : ''].filter(Boolean).join(' ');
+      const cls = ['w', on ? 'on' : '', on && r.done ? 'done' : '', on && r.da >= w ? 'start' : '', on && r.a < addD(w,7) ? 'end' : '', +w === +oggi ? 'oggi' : ''].filter(Boolean).join(' ');
       h += '<td class="' + cls + '"></td>';
     });
     h += '</tr>';
