@@ -36,6 +36,37 @@ const STATI_VALIDI: StatoTecnico[] = [
   "sospeso",
 ];
 
+/** Corpo accettato da POST e PATCH: i dati del contatto più l'azienda per nome. */
+type CorpoContatto = Partial<DatiContatto> & { aziendaNome?: string | null };
+
+/**
+ * Traduce `aziendaNome` in un `aziendaId`, creando l'azienda se non esiste.
+ *
+ * I tre esiti sono distinti e voluti: `undefined` significa "il campo non è
+ * stato passato, non toccare l'azienda", `null` significa "stacca l'azienda".
+ * Chi chiama decide se onorare il `null`: la POST lo ignora, la PATCH no.
+ */
+function risolviAziendaDaNome(
+  db: Database,
+  nome: string | null | undefined,
+): number | null | undefined {
+  if (nome === undefined) return undefined;
+  const pulito = nome?.trim();
+  return pulito ? risolviOCreaAzienda(db, pulito) : null;
+}
+
+/**
+ * Vero solo per la violazione di UNIQUE sull'email dei contatti.
+ *
+ * Serve a non spacciare per "email già presente" ogni altro errore SQLite:
+ * `aggiornaContatto` scrive anche i tag, e un fallimento lì non ha nulla a
+ * che vedere con l'email.
+ */
+function eEmailDuplicata(errore: unknown): boolean {
+  const messaggio = errore instanceof Error ? errore.message : String(errore);
+  return /UNIQUE constraint failed:\s*contatti\.email/i.test(messaggio);
+}
+
 export default function createRoutes(deps: {
   db: Database;
   slug: string;
@@ -67,33 +98,33 @@ export default function createRoutes(deps: {
   });
 
   r.post("/contatti", async (c) => {
-    const body: Partial<DatiContatto> & { aziendaNome?: string | null } =
-      await c.req
-        .json<Partial<DatiContatto> & { aziendaNome?: string | null }>()
-        .catch(() => ({}));
+    const { aziendaNome, ...body }: CorpoContatto = await c.req
+      .json<CorpoContatto>()
+      .catch(() => ({}));
     if (!body.email) return c.json({ errore: "email_mancante" }, 400);
     if (!emailValida(normalizzaEmail(body.email))) {
       return c.json({ errore: "email_non_valida" }, 400);
     }
-    if (body.aziendaNome !== undefined && !body.aziendaId) {
-      if (body.aziendaNome && body.aziendaNome.trim()) {
-        body.aziendaId = risolviOCreaAzienda(db, body.aziendaNome.trim());
-      }
+    // Un `aziendaId` esplicito vince sul nome; in creazione un nome vuoto non
+    // ha nulla da staccare, quindi il `null` di ritorno si scarta.
+    if (body.aziendaId == null) {
+      const risolto = risolviAziendaDaNome(db, aziendaNome);
+      if (risolto != null) body.aziendaId = risolto;
     }
     try {
       return c.json({ id: creaContatto(db, body as DatiContatto) }, 201);
-    } catch {
-      return c.json({ errore: "email_gia_presente" }, 409);
+    } catch (e) {
+      if (eEmailDuplicata(e)) return c.json({ errore: "email_gia_presente" }, 409);
+      throw e;
     }
   });
 
   r.patch("/contatti/:id", async (c) => {
     const id = Number(c.req.param("id"));
     if (!leggiContatto(db, id)) return c.json({ errore: "non_trovato" }, 404);
-    const body: Partial<DatiContatto> & { aziendaNome?: string | null } =
-      await c.req
-        .json<Partial<DatiContatto> & { aziendaNome?: string | null }>()
-        .catch(() => ({}));
+    const { aziendaNome, ...body }: CorpoContatto = await c.req
+      .json<CorpoContatto>()
+      .catch(() => ({}));
     if (body.email !== undefined) {
       if (!body.email.trim() || !emailValida(normalizzaEmail(body.email))) {
         return c.json({ errore: "email_non_valida" }, 400);
@@ -102,18 +133,15 @@ export default function createRoutes(deps: {
     if (body.statoTecnico && !STATI_VALIDI.includes(body.statoTecnico as StatoTecnico)) {
       return c.json({ errore: "stato_tecnico_non_valido", attesi: STATI_VALIDI }, 400);
     }
-    if (body.aziendaNome !== undefined) {
-      if (body.aziendaNome && body.aziendaNome.trim()) {
-        body.aziendaId = risolviOCreaAzienda(db, body.aziendaNome.trim());
-      } else {
-        body.aziendaId = null;
-      }
-    }
+    // Qui il `null` si onora: `aziendaNome` vuoto stacca l'azienda.
+    const risolto = risolviAziendaDaNome(db, aziendaNome);
+    if (risolto !== undefined) body.aziendaId = risolto;
     try {
       aggiornaContatto(db, id, body);
       return c.json({ ok: true });
-    } catch {
-      return c.json({ errore: "email_gia_presente" }, 409);
+    } catch (e) {
+      if (eEmailDuplicata(e)) return c.json({ errore: "email_gia_presente" }, 409);
+      throw e;
     }
   });
 

@@ -157,3 +157,76 @@ describe("PATCH /contatti/:id — aggiornamento contatto", () => {
     expect((await res.json()).errore).toBe("email_gia_presente");
   });
 });
+
+describe("PATCH /contatti/:id — azienda e classificazione degli errori", () => {
+  test("aziendaNome vuoto stacca l'azienda", async () => {
+    const id = creaContatto(db, { email: "anna@test.it" });
+    await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aziendaNome: "Acme" }),
+    });
+    expect(leggiContatto(db, id)!.aziendaNome).toBe("Acme");
+
+    const res = await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aziendaNome: null }),
+    });
+    expect(res.status).toBe(200);
+    expect(leggiContatto(db, id)!.aziendaId).toBeNull();
+  });
+
+  test("aziendaNome assente lascia l'azienda invariata", async () => {
+    const id = creaContatto(db, { email: "anna@test.it" });
+    await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aziendaNome: "Acme" }),
+    });
+    await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: "Anna" }),
+    });
+    expect(leggiContatto(db, id)!.aziendaNome).toBe("Acme");
+  });
+
+  test("un errore che non riguarda l'email non viene spacciato per 409", async () => {
+    const id = creaContatto(db, { email: "anna@test.it" });
+    db.run("DROP TABLE contatti_tag");
+    const res = await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: "Anna", tag: ["vip"] }),
+    });
+    // Prima il catch generico rispondeva 409 "email_gia_presente" anche qui:
+    // ora l'errore risale a Hono, che lo classifica come 500.
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain("email_gia_presente");
+  });
+});
+
+describe("POST /contatti — azienda", () => {
+  test("aziendaId esplicito vince su aziendaNome", async () => {
+    const creata = await app.request("/aziende", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: "Prima" }),
+    });
+    const { id: aziendaId } = await creata.json();
+
+    const res = await app.request("/contatti", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "tizio@test.it",
+        aziendaId,
+        aziendaNome: "Seconda",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    expect(leggiContatto(db, id)!.aziendaNome).toBe("Prima");
+  });
+});
