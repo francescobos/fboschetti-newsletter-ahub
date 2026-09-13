@@ -1,4 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Header } from "@/components/layout/header";
+import { Main } from "@/components/layout/main";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const meta = {
   title: "Contatti",
@@ -36,32 +65,44 @@ export default function PaginaContatti() {
   const [righe, setRighe] = useState<Contatto[]>([]);
   const [totale, setTotale] = useState(0);
   const [testo, setTesto] = useState("");
-  const [iscritto, setIscritto] = useState<string>("");
-  const [tag, setTag] = useState("");
+  const [iscritto, setIscritto] = useState<string>("all");
+  const [tag, setTag] = useState<string>("all");
   const [tagDisponibili, setTagDisponibili] = useState<string[]>([]);
   const [anteprima, setAnteprima] = useState<Rapporto | null>(null);
   const [fileScelto, setFileScelto] = useState<File | null>(null);
+  const [dialogImportAperto, setDialogImportAperto] = useState(false);
+  const [contattoDaDisiscrivere, setContattoDaDisiscrivere] = useState<Contatto | null>(null);
+  const [canaleDisiscrizione, setCanaleDisiscrizione] = useState<string>("manuale");
   const [errore, setErrore] = useState<string | null>(null);
   const [caricamento, setCaricamento] = useState(false);
+  const [importInCorso, setImportInCorso] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function carica() {
     setCaricamento(true);
     const q = new URLSearchParams();
     if (testo) q.set("testo", testo);
-    if (iscritto) q.set("iscritto", iscritto);
-    if (tag) q.set("tag", tag);
-    const res = await fetch(`${API}/contatti?${q}`);
-    const dati = (await res.json()) as { righe: Contatto[]; totale: number };
-    setRighe(dati.righe);
-    setTotale(dati.totale);
-    setCaricamento(false);
+    if (iscritto && iscritto !== "all") q.set("iscritto", iscritto);
+    if (tag && tag !== "all") q.set("tag", tag);
+    try {
+      const res = await fetch(`${API}/contatti?${q}`);
+      const dati = (await res.json()) as { righe: Contatto[]; totale: number };
+      setRighe(dati.righe ?? []);
+      setTotale(dati.totale ?? 0);
+    } catch {
+      setRighe([]);
+    } finally {
+      setCaricamento(false);
+    }
   }
 
   useEffect(() => {
     void carica();
     void fetch(`${API}/tag`)
       .then((r) => r.json() as Promise<{ righe: { nome: string }[] }>)
-      .then((d) => setTagDisponibili(d.righe.map((t) => t.nome)));
+      .then((d) => setTagDisponibili(d.righe.map((t) => t.nome)))
+      .catch(() => setTagDisponibili([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testo, iscritto, tag]);
 
@@ -75,7 +116,7 @@ export default function PaginaContatti() {
     });
     const dati = (await res.json()) as { rapporto?: Rapporto; errore?: string };
     if (!res.ok || dati.errore) {
-      setErrore(dati.errore ?? "import fallito");
+      setErrore(dati.errore ?? "Import fallito.");
       setAnteprima(null);
       return null;
     }
@@ -84,15 +125,28 @@ export default function PaginaContatti() {
 
   async function scegliFile(file: File) {
     setFileScelto(file);
-    setAnteprima(await inviaFile(file, true));
+    setDialogImportAperto(true);
+    const rap = await inviaFile(file, true);
+    setAnteprima(rap);
   }
 
   async function confermaImport() {
     if (!fileScelto) return;
+    setImportInCorso(true);
     await inviaFile(fileScelto, false);
+    setImportInCorso(false);
+    chiudiDialogImport();
+    await carica();
+  }
+
+  function chiudiDialogImport() {
+    setDialogImportAperto(false);
     setAnteprima(null);
     setFileScelto(null);
-    await carica();
+    setErrore(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function azione(id: number, percorso: string, corpo?: unknown) {
@@ -104,191 +158,328 @@ export default function PaginaContatti() {
     await carica();
   }
 
+  async function confermaDisiscrizione() {
+    if (!contattoDaDisiscrivere) return;
+    await azione(contattoDaDisiscrivere.id, "disiscrivi", { via: canaleDisiscrizione });
+    setContattoDaDisiscrivere(null);
+    setCanaleDisiscrizione("manuale");
+  }
+
   return (
-    <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Contatti</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {totale} contatti in anagrafica
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <input
-          className="border-border bg-background rounded border px-3 py-1.5 text-sm"
-          placeholder="Cerca per email, nome, azienda…"
-          value={testo}
-          onChange={(e) => setTesto(e.target.value)}
-        />
-        <select
-          className="border-border bg-background rounded border px-3 py-1.5 text-sm"
-          value={iscritto}
-          onChange={(e) => setIscritto(e.target.value)}
-        >
-          <option value="">Tutti</option>
-          <option value="true">Iscritti</option>
-          <option value="false">Disiscritti</option>
-        </select>
-        <select
-          className="border-border bg-background rounded border px-3 py-1.5 text-sm"
-          value={tag}
-          onChange={(e) => setTag(e.target.value)}
-        >
-          <option value="">Tutti i tag</option>
-          {tagDisponibili.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <label className="border-border bg-muted/30 hover:bg-muted cursor-pointer rounded border px-3 py-1.5 text-sm">
-          Importa CSV
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void scegliFile(f);
-            }}
-          />
-        </label>
-      </div>
-
-      {errore && (
-        <div className="border-border bg-muted/30 rounded border p-4 text-sm">
-          <span className="font-medium">CSV rifiutato.</span> {errore}
-        </div>
-      )}
-
-      {anteprima && (
-        <div className="border-border bg-muted/30 space-y-3 rounded border p-4">
-          <p className="text-sm font-medium">Anteprima dell'import</p>
-          <ul className="text-muted-foreground space-y-1 text-sm">
-            <li>{anteprima.righeLette} righe lette</li>
-            <li>{anteprima.creati} contatti nuovi</li>
-            <li>{anteprima.aggiornati} contatti aggiornati</li>
-            <li>
-              {anteprima.disiscrittiIntatti} disiscritti che resteranno tali
-            </li>
-            <li>{anteprima.aziendeCreate} aziende nuove</li>
-          </ul>
-          <div className="flex gap-2">
-            <button
-              className="bg-primary text-primary-foreground rounded px-3 py-1 text-xs font-medium hover:opacity-85"
-              onClick={() => void confermaImport()}
-            >
-              Conferma import
-            </button>
-            <button
-              className="border-border rounded border px-3 py-1 text-xs"
-              onClick={() => {
-                setAnteprima(null);
-                setFileScelto(null);
+    <>
+      <Header>
+        <div className="flex w-full items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Contatti</h1>
+            <p className="text-sm text-muted-foreground">
+              {totale} contatti in anagrafica
+            </p>
+          </div>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void scegliFile(f);
               }}
+            />
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
             >
-              Annulla
-            </button>
+              Importa CSV
+            </Button>
           </div>
         </div>
-      )}
+      </Header>
 
-      <div className="border-border overflow-x-auto rounded border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/30">
-            <tr className="text-muted-foreground text-left">
-              <th className="px-3 py-2 font-medium">Email</th>
-              <th className="px-3 py-2 font-medium">Nome</th>
-              <th className="px-3 py-2 font-medium">Azienda</th>
-              <th className="px-3 py-2 font-medium">Zona</th>
-              <th className="px-3 py-2 font-medium">Tag</th>
-              <th className="px-3 py-2 font-medium">Stato</th>
-              <th className="px-3 py-2 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {righe.map((c) => (
-              <tr key={c.id} className="border-border border-t">
-                <td className="px-3 py-2">{c.email}</td>
-                <td className="px-3 py-2">
-                  {[c.nome, c.cognome].filter(Boolean).join(" ") || "—"}
-                </td>
-                <td className="px-3 py-2">
-                  {c.aziendaNome ?? "—"}
-                  {c.ruolo && (
-                    <span className="text-muted-foreground"> · {c.ruolo}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {c.comune ?? "—"}
-                  {c.provincia && (
-                    <span className="text-muted-foreground"> ({c.provincia})</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    {c.tag.map((t) => (
-                      <span
-                        key={t}
-                        className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs"
-                      >
-                        {t}
+      <Main className="p-6 space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            className="w-full sm:w-72"
+            placeholder="Cerca per email, nome, azienda…"
+            value={testo}
+            onChange={(e) => setTesto(e.target.value)}
+          />
+
+          <Select value={iscritto} onValueChange={setIscritto}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Tutti gli stati" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti gli stati</SelectItem>
+              <SelectItem value="true">Iscritti</SelectItem>
+              <SelectItem value="false">Disiscritti</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={tag} onValueChange={setTag}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Tutti i tag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti i tag</SelectItem>
+              {tagDisponibili.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="rounded-md border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[240px]">Email</TableHead>
+                <TableHead className="w-[180px]">Nome</TableHead>
+                <TableHead className="w-[200px]">Azienda</TableHead>
+                <TableHead className="w-[160px]">Zona</TableHead>
+                <TableHead>Tag</TableHead>
+                <TableHead className="w-[180px]">Stato</TableHead>
+                <TableHead className="w-[120px] text-right">Azioni</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {righe.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium max-w-[240px] truncate" title={c.email}>
+                    {c.email}
+                  </TableCell>
+                  <TableCell className="max-w-[180px] truncate">
+                    {[c.nome, c.cognome].filter(Boolean).join(" ") || "—"}
+                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate">
+                    {c.aziendaNome ? (
+                      <span>
+                        {c.aziendaNome}
+                        {c.ruolo && (
+                          <span className="text-muted-foreground text-xs block truncate">
+                            {c.ruolo}
+                          </span>
+                        )}
                       </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  {c.iscritto ? (
-                    <span className="text-muted-foreground text-xs">iscritto</span>
-                  ) : (
-                    <span className="border-border rounded border px-1.5 py-0.5 text-xs font-medium">
-                      disiscritto{c.disiscrittoVia ? ` · ${c.disiscrittoVia}` : ""}
-                    </span>
-                  )}
-                  {c.statoTecnico !== "mai_verificato" && (
-                    <span className="text-muted-foreground ml-1 text-xs">
-                      · {c.statoTecnico}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {c.iscritto ? (
-                    <button
-                      className="border-border rounded border px-2 py-1 text-xs"
-                      onClick={() => {
-                        const via = window.prompt(
-                          "Come si è disiscritto? telefono / email / manuale",
-                          "manuale",
-                        );
-                        if (via) void azione(c.id, "disiscrivi", { via });
-                      }}
-                    >
-                      Disiscrivi
-                    </button>
-                  ) : (
-                    <button
-                      className="bg-primary text-primary-foreground rounded px-2 py-1 text-xs font-medium hover:opacity-85"
-                      onClick={() => void azione(c.id, "riscrivi")}
-                    >
-                      Riscrivi
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {righe.length === 0 && !caricamento && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="text-muted-foreground px-3 py-8 text-center"
-                >
-                  Nessun contatto. Importa un CSV per cominciare.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-[160px] truncate">
+                    {c.comune ? (
+                      <span>
+                        {c.comune}
+                        {c.provincia && (
+                          <span className="text-muted-foreground"> ({c.provincia})</span>
+                        )}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {c.tag.length > 0 ? (
+                        c.tag.map((t) => (
+                          <Badge key={t} variant="secondary" className="text-xs">
+                            {t}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {c.iscritto ? (
+                        <Badge variant="outline" className="w-fit text-xs font-normal">
+                          iscritto
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="w-fit text-xs font-normal">
+                          disiscritto{c.disiscrittoVia ? ` (${c.disiscrittoVia})` : ""}
+                        </Badge>
+                      )}
+                      {c.statoTecnico !== "mai_verificato" && (
+                        <span className="text-muted-foreground text-xs">
+                          {c.statoTecnico}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {c.iscritto ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setCanaleDisiscrizione("manuale");
+                          setContattoDaDisiscrivere(c);
+                        }}
+                      >
+                        Disiscrivi
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => void azione(c.id, "riscrivi")}
+                      >
+                        Riscrivi
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+
+              {righe.length === 0 && !caricamento && (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="h-32 text-center text-muted-foreground"
+                  >
+                    Nessun contatto trovato. Importa un file CSV per cominciare.
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {caricamento && (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="h-32 text-center text-muted-foreground"
+                  >
+                    Caricamento contatti…
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Main>
+
+      {/* Dialog per Disiscrizione */}
+      <Dialog
+        open={Boolean(contattoDaDisiscrivere)}
+        onOpenChange={(aperto) => {
+          if (!aperto) setContattoDaDisiscrivere(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disiscrivi contatto</DialogTitle>
+            <DialogDescription>
+              Stai per disiscrivere{" "}
+              <span className="font-semibold text-foreground">
+                {contattoDaDisiscrivere?.email}
+              </span>
+              . Seleziona il canale attraverso cui è pervenuta la richiesta.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 space-y-2">
+            <label className="text-sm font-medium">Canale di disiscrizione</label>
+            <Select
+              value={canaleDisiscrizione}
+              onValueChange={setCanaleDisiscrizione}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleziona canale" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manuale">Manuale</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="telefono">Telefono</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setContattoDaDisiscrivere(null)}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => void confermaDisiscrizione()}
+            >
+              Conferma disiscrizione
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog per Import CSV */}
+      <Dialog
+        open={dialogImportAperto}
+        onOpenChange={(aperto) => {
+          if (!aperto) chiudiDialogImport();
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importazione Contatti CSV</DialogTitle>
+            <DialogDescription>
+              {fileScelto ? fileScelto.name : "Carica un file CSV di contatti"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {errore && (
+            <Alert variant="destructive">
+              <AlertTitle>Errore importazione</AlertTitle>
+              <AlertDescription>{errore}</AlertDescription>
+            </Alert>
+          )}
+
+          {anteprima && !errore && (
+            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4 text-sm">
+              <p className="font-medium text-foreground">Rapporto anteprima (dry-run):</p>
+              <ul className="space-y-1 text-muted-foreground text-sm">
+                <li>• {anteprima.righeLette} righe lette</li>
+                <li>• {anteprima.creati} contatti nuovi da creare</li>
+                <li>• {anteprima.aggiornati} contatti esistenti da aggiornare</li>
+                <li>• {anteprima.disiscrittiIntatti} contatti disiscritti che rimarranno tali</li>
+                <li>• {anteprima.aziendeCreate} nuove aziende censite</li>
+              </ul>
+            </div>
+          )}
+
+          {!anteprima && !errore && (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Analisi del file in corso…
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={chiudiDialogImport}
+              disabled={importInCorso}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              disabled={!anteprima || Boolean(errore) || importInCorso}
+              onClick={() => void confermaImport()}
+            >
+              {importInCorso ? "Importazione in corso…" : "Conferma import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

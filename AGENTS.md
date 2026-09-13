@@ -92,11 +92,8 @@ Valgono per ogni file sotto `web/pages/`.
   layout desktop e mobile — qui la lista contatti è una tabella con email
   lunghe, quindi servono overflow controllato e truncation.
 
-⚠️ **Debito noto:** `web/pages/index.tsx` è stato scritto in Tailwind puro,
-senza componenti del core: contiene `<button>`, `<table>`, `<input>` e
-`<select>` nudi e non usa `Header`/`Main`. I token di tema invece sono corretti.
-Va migrato ai componenti shadcn; nel frattempo non prendere quel file come
-modello per pagine nuove.
+`web/pages/index.tsx` è conforme a queste regole e funge da modello per
+altre pagine del plugin.
 
 `web/` è fuori dall'`include` di `tsconfig.json`: l'alias `@/*` risolve solo
 nella tsconfig del core, quindi `bun run check` qui non vede le pagine. La UI si
