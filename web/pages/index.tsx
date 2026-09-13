@@ -77,6 +77,20 @@ export default function PaginaContatti() {
   const [caricamento, setCaricamento] = useState(false);
   const [importInCorso, setImportInCorso] = useState(false);
 
+  // Stati per Form unificato (Nuovo Contatto / Modifica)
+  const [dialogFormAperto, setDialogFormAperto] = useState(false);
+  const [contattoInModifica, setContattoInModifica] = useState<Contatto | null>(null);
+  const [formEmail, setFormEmail] = useState("");
+  const [formNome, setFormNome] = useState("");
+  const [formCognome, setFormCognome] = useState("");
+  const [formAziendaNome, setFormAziendaNome] = useState("");
+  const [formRuolo, setFormRuolo] = useState("");
+  const [formComune, setFormComune] = useState("");
+  const [formProvincia, setFormProvincia] = useState("");
+  const [formTag, setFormTag] = useState("");
+  const [formErrore, setFormErrore] = useState<string | null>(null);
+  const [salvataggioInCorso, setSalvataggioInCorso] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function carica() {
@@ -97,12 +111,19 @@ export default function PaginaContatti() {
     }
   }
 
+  async function caricaTag() {
+    try {
+      const r = await fetch(`${API}/tag`);
+      const d = (await r.json()) as { righe: { nome: string }[] };
+      setTagDisponibili(d.righe.map((t) => t.nome));
+    } catch {
+      setTagDisponibili([]);
+    }
+  }
+
   useEffect(() => {
     void carica();
-    void fetch(`${API}/tag`)
-      .then((r) => r.json() as Promise<{ righe: { nome: string }[] }>)
-      .then((d) => setTagDisponibili(d.righe.map((t) => t.nome)))
-      .catch(() => setTagDisponibili([]));
+    void caricaTag();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testo, iscritto, tag]);
 
@@ -137,6 +158,7 @@ export default function PaginaContatti() {
     setImportInCorso(false);
     chiudiDialogImport();
     await carica();
+    await caricaTag();
   }
 
   function chiudiDialogImport() {
@@ -165,6 +187,117 @@ export default function PaginaContatti() {
     setCanaleDisiscrizione("manuale");
   }
 
+  // Azioni form Crea / Modifica
+  function apriNuovo() {
+    setContattoInModifica(null);
+    setFormEmail("");
+    setFormNome("");
+    setFormCognome("");
+    setFormAziendaNome("");
+    setFormRuolo("");
+    setFormComune("");
+    setFormProvincia("");
+    setFormTag("");
+    setFormErrore(null);
+    setDialogFormAperto(true);
+  }
+
+  function apriModifica(c: Contatto) {
+    setContattoInModifica(c);
+    setFormEmail(c.email);
+    setFormNome(c.nome ?? "");
+    setFormCognome(c.cognome ?? "");
+    setFormAziendaNome(c.aziendaNome ?? "");
+    setFormRuolo(c.ruolo ?? "");
+    setFormComune(c.comune ?? "");
+    setFormProvincia(c.provincia ?? "");
+    setFormTag(c.tag.join(", "));
+    setFormErrore(null);
+    setDialogFormAperto(true);
+  }
+
+  function chiudiDialogForm() {
+    setDialogFormAperto(false);
+    setContattoInModifica(null);
+    setFormErrore(null);
+  }
+
+  function aggiungiTagAlForm(nomeTag: string) {
+    const lista = formTag
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!lista.some((t) => t.toLowerCase() === nomeTag.toLowerCase())) {
+      lista.push(nomeTag);
+      setFormTag(lista.join(", "));
+    }
+  }
+
+  async function salvaContatto(e: React.FormEvent) {
+    e.preventDefault();
+    setFormErrore(null);
+
+    const emailTrim = formEmail.trim();
+    if (!emailTrim) {
+      setFormErrore("L'email è obbligatoria.");
+      return;
+    }
+
+    const tagArray = formTag
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+
+    const payload = {
+      email: emailTrim,
+      nome: formNome.trim() || null,
+      cognome: formCognome.trim() || null,
+      aziendaNome: formAziendaNome.trim() || null,
+      ruolo: formRuolo.trim() || null,
+      comune: formComune.trim() || null,
+      provincia: formProvincia.trim() || null,
+      tag: tagArray,
+    };
+
+    setSalvataggioInCorso(true);
+    try {
+      const url = contattoInModifica
+        ? `${API}/contatti/${contattoInModifica.id}`
+        : `${API}/contatti`;
+      const metodo = contattoInModifica ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const dati = (await res.json()) as { id?: number; errore?: string; ok?: boolean };
+
+      if (res.status === 409 || dati.errore === "email_gia_presente") {
+        setFormErrore("Questa email è già associata a un altro contatto.");
+        return;
+      }
+
+      if (!res.ok || dati.errore) {
+        setFormErrore(
+          dati.errore === "email_non_valida"
+            ? "Formato email non valido."
+            : dati.errore ?? "Errore durante il salvataggio.",
+        );
+        return;
+      }
+
+      chiudiDialogForm();
+      await carica();
+      await caricaTag();
+    } catch {
+      setFormErrore("Errore di connessione durante il salvataggio.");
+    } finally {
+      setSalvataggioInCorso(false);
+    }
+  }
+
   return (
     <>
       <Header>
@@ -175,7 +308,29 @@ export default function PaginaContatti() {
               {totale} contatti in anagrafica
             </p>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={apriNuovo}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-1.5"
+              >
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+              Nuovo contatto
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -187,7 +342,7 @@ export default function PaginaContatti() {
               }}
             />
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
             >
@@ -236,25 +391,25 @@ export default function PaginaContatti() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[240px]">Email</TableHead>
-                <TableHead className="w-[180px]">Nome</TableHead>
-                <TableHead className="w-[200px]">Azienda</TableHead>
-                <TableHead className="w-[160px]">Zona</TableHead>
+                <TableHead className="w-[230px]">Email</TableHead>
+                <TableHead className="w-[170px]">Nome</TableHead>
+                <TableHead className="w-[190px]">Azienda</TableHead>
+                <TableHead className="w-[150px]">Zona</TableHead>
                 <TableHead>Tag</TableHead>
-                <TableHead className="w-[180px]">Stato</TableHead>
-                <TableHead className="w-[120px] text-right">Azioni</TableHead>
+                <TableHead className="w-[170px]">Stato</TableHead>
+                <TableHead className="w-[180px] text-right">Azioni</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {righe.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium max-w-[240px] truncate" title={c.email}>
+                  <TableCell className="font-medium max-w-[230px] truncate" title={c.email}>
                     {c.email}
                   </TableCell>
-                  <TableCell className="max-w-[180px] truncate">
+                  <TableCell className="max-w-[170px] truncate">
                     {[c.nome, c.cognome].filter(Boolean).join(" ") || "—"}
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
+                  <TableCell className="max-w-[190px] truncate">
                     {c.aziendaNome ? (
                       <span>
                         {c.aziendaNome}
@@ -268,7 +423,7 @@ export default function PaginaContatti() {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="max-w-[160px] truncate">
+                  <TableCell className="max-w-[150px] truncate">
                     {c.comune ? (
                       <span>
                         {c.comune}
@@ -312,28 +467,54 @@ export default function PaginaContatti() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.iscritto ? (
+                    <div className="flex items-center justify-end gap-1.5">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="text-xs"
-                        onClick={() => {
-                          setCanaleDisiscrizione("manuale");
-                          setContattoDaDisiscrivere(c);
-                        }}
+                        className="h-8 px-2 text-xs"
+                        onClick={() => apriModifica(c)}
+                        title="Modifica contatto"
                       >
-                        Disiscrivi
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="mr-1 opacity-70"
+                        >
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                          <path d="m15 5 4 4" />
+                        </svg>
+                        Modifica
                       </Button>
-                    ) : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => void azione(c.id, "riscrivi")}
-                      >
-                        Riscrivi
-                      </Button>
-                    )}
+                      {c.iscritto ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => {
+                            setCanaleDisiscrizione("manuale");
+                            setContattoDaDisiscrivere(c);
+                          }}
+                        >
+                          Disiscrivi
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => void azione(c.id, "riscrivi")}
+                        >
+                          Riscrivi
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -344,7 +525,7 @@ export default function PaginaContatti() {
                     colSpan={7}
                     className="h-32 text-center text-muted-foreground"
                   >
-                    Nessun contatto trovato. Importa un file CSV per cominciare.
+                    Nessun contatto trovato. Inserisci un nuovo contatto o importa un file CSV.
                   </TableCell>
                 </TableRow>
               )}
@@ -363,6 +544,190 @@ export default function PaginaContatti() {
           </Table>
         </div>
       </Main>
+
+      {/* Dialog Unificato per Nuovo Contatto / Modifica */}
+      <Dialog
+        open={dialogFormAperto}
+        onOpenChange={(aperto) => {
+          if (!aperto) chiudiDialogForm();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {contattoInModifica ? "Modifica contatto" : "Nuovo contatto"}
+            </DialogTitle>
+            <DialogDescription>
+              {contattoInModifica
+                ? "Aggiorna le informazioni anagrafiche e i tag del contatto."
+                : "Inserisci i dati per registrare un nuovo contatto in anagrafica."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {contattoInModifica && (
+            <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Stato iscrizione:</span>
+                {contattoInModifica.iscritto ? (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    iscritto
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs font-normal">
+                    disiscritto{contattoInModifica.disiscrittoVia ? ` (${contattoInModifica.disiscrittoVia})` : ""}
+                  </Badge>
+                )}
+              </div>
+              {contattoInModifica.statoTecnico !== "mai_verificato" && (
+                <span className="text-muted-foreground">
+                  Stato: <span className="text-foreground font-medium">{contattoInModifica.statoTecnico}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {formErrore && (
+            <Alert variant="destructive">
+              <AlertTitle>Errore</AlertTitle>
+              <AlertDescription>{formErrore}</AlertDescription>
+            </Alert>
+          )}
+
+          <form onSubmit={salvaContatto} className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Email *</label>
+              <Input
+                type="email"
+                placeholder="es. mario.rossi@azienda.it"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Nome</label>
+                <Input
+                  placeholder="Nome"
+                  value={formNome}
+                  onChange={(e) => setFormNome(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Cognome</label>
+                <Input
+                  placeholder="Cognome"
+                  value={formCognome}
+                  onChange={(e) => setFormCognome(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Azienda</label>
+                <Input
+                  placeholder="Ragione sociale"
+                  value={formAziendaNome}
+                  onChange={(e) => setFormAziendaNome(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Ruolo</label>
+                <Input
+                  placeholder="es. CTO, Responsabile Vendite"
+                  value={formRuolo}
+                  onChange={(e) => setFormRuolo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Comune</label>
+                <Input
+                  placeholder="es. Milano"
+                  value={formComune}
+                  onChange={(e) => setFormComune(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Provincia (sigla)</label>
+                <Input
+                  placeholder="es. MI"
+                  maxLength={5}
+                  value={formProvincia}
+                  onChange={(e) => setFormProvincia(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium">Tag (separati da virgola)</label>
+                {tagDisponibili.length > 0 && (
+                  <span className="text-muted-foreground text-xs">clicca per aggiungere</span>
+                )}
+              </div>
+              <Input
+                placeholder="es. partner, vip, eventi"
+                value={formTag}
+                onChange={(e) => setFormTag(e.target.value)}
+              />
+              {tagDisponibili.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {tagDisponibili.map((t) => {
+                    const tagsPresenti = formTag
+                      .split(",")
+                      .map((x) => x.trim().toLowerCase())
+                      .filter(Boolean);
+                    const giaAggiunto = tagsPresenti.includes(t.toLowerCase());
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => aggiungiTagAlForm(t)}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          giaAggiunto
+                            ? "bg-primary text-primary-foreground border-primary cursor-default"
+                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80 cursor-pointer"
+                        }`}
+                      >
+                        +{t}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={chiudiDialogForm}
+                disabled={salvataggioInCorso}
+              >
+                Annulla
+              </Button>
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={salvataggioInCorso}
+              >
+                {salvataggioInCorso
+                  ? "Salvataggio…"
+                  : contattoInModifica
+                    ? "Salva modifiche"
+                    : "Crea contatto"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog per Disiscrizione */}
       <Dialog

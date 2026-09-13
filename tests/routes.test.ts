@@ -101,4 +101,59 @@ describe("POST /contatti — validazione email", () => {
     const corpo = await res.json();
     expect(typeof corpo.id).toBe("number");
   });
+
+  test("risolve o crea l'azienda passando aziendaNome", async () => {
+    const res = await app.request("/contatti", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "luigi@acme.it", aziendaNome: "Acme Corp" }),
+    });
+    expect(res.status).toBe(201);
+    const corpo = await res.json();
+    const contatto = leggiContatto(db, corpo.id)!;
+    expect(contatto.aziendaNome).toBe("Acme Corp");
+  });
+});
+
+describe("PATCH /contatti/:id — aggiornamento contatto", () => {
+  test("aggiorna i campi anagrafici e l'azienda via aziendaNome", async () => {
+    const id = creaContatto(db, { email: "anna@test.it", nome: "Anna" });
+    const res = await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: "Annachiara",
+        aziendaNome: "Nuova Azienda",
+        ruolo: "CEO",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const contatto = leggiContatto(db, id)!;
+    expect(contatto.nome).toBe("Annachiara");
+    expect(contatto.aziendaNome).toBe("Nuova Azienda");
+    expect(contatto.ruolo).toBe("CEO");
+  });
+
+  test("rifiuta email non valida con 400", async () => {
+    const id = creaContatto(db, { email: "anna@test.it" });
+    const res = await app.request(`/contatti/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "email-sbagliata" }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).errore).toBe("email_non_valida");
+  });
+
+  test("rifiuta email già presente con 409", async () => {
+    creaContatto(db, { email: "primo@test.it" });
+    const id2 = creaContatto(db, { email: "secondo@test.it" });
+    const res = await app.request(`/contatti/${id2}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "primo@test.it" }),
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).errore).toBe("email_gia_presente");
+  });
 });

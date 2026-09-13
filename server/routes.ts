@@ -67,12 +67,18 @@ export default function createRoutes(deps: {
   });
 
   r.post("/contatti", async (c) => {
-    const body: Partial<DatiContatto> = await c.req
-      .json<Partial<DatiContatto>>()
-      .catch(() => ({}));
+    const body: Partial<DatiContatto> & { aziendaNome?: string | null } =
+      await c.req
+        .json<Partial<DatiContatto> & { aziendaNome?: string | null }>()
+        .catch(() => ({}));
     if (!body.email) return c.json({ errore: "email_mancante" }, 400);
     if (!emailValida(normalizzaEmail(body.email))) {
       return c.json({ errore: "email_non_valida" }, 400);
+    }
+    if (body.aziendaNome !== undefined && !body.aziendaId) {
+      if (body.aziendaNome && body.aziendaNome.trim()) {
+        body.aziendaId = risolviOCreaAzienda(db, body.aziendaNome.trim());
+      }
     }
     try {
       return c.json({ id: creaContatto(db, body as DatiContatto) }, 201);
@@ -84,14 +90,31 @@ export default function createRoutes(deps: {
   r.patch("/contatti/:id", async (c) => {
     const id = Number(c.req.param("id"));
     if (!leggiContatto(db, id)) return c.json({ errore: "non_trovato" }, 404);
-    const body: Partial<DatiContatto> = await c.req
-      .json<Partial<DatiContatto>>()
-      .catch(() => ({}));
+    const body: Partial<DatiContatto> & { aziendaNome?: string | null } =
+      await c.req
+        .json<Partial<DatiContatto> & { aziendaNome?: string | null }>()
+        .catch(() => ({}));
+    if (body.email !== undefined) {
+      if (!body.email.trim() || !emailValida(normalizzaEmail(body.email))) {
+        return c.json({ errore: "email_non_valida" }, 400);
+      }
+    }
     if (body.statoTecnico && !STATI_VALIDI.includes(body.statoTecnico as StatoTecnico)) {
       return c.json({ errore: "stato_tecnico_non_valido", attesi: STATI_VALIDI }, 400);
     }
-    aggiornaContatto(db, id, body);
-    return c.json({ ok: true });
+    if (body.aziendaNome !== undefined) {
+      if (body.aziendaNome && body.aziendaNome.trim()) {
+        body.aziendaId = risolviOCreaAzienda(db, body.aziendaNome.trim());
+      } else {
+        body.aziendaId = null;
+      }
+    }
+    try {
+      aggiornaContatto(db, id, body);
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ errore: "email_gia_presente" }, 409);
+    }
   });
 
   r.post("/contatti/:id/disiscrivi", async (c) => {
