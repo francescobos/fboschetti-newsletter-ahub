@@ -16,8 +16,17 @@ import {
   type FiltriContatti,
   type StatoTecnico,
 } from "./contatti";
+import { accoda, avvia, prova, statoCampagna, type MailMinima } from "./campagne";
 import { emailValida, normalizzaEmail } from "./csv";
+import { risolviDestinatari } from "./destinatari";
+import {
+  avanzaStato,
+  elencaEdizioni,
+  leggiEdizione,
+  type Stato,
+} from "./edizioni";
 import { importaCsv, storicoImport } from "./import";
+import { ingestaDaPercorso } from "./ingestione";
 
 /**
  * Route del plugin, montate sotto /api/plugins/fboschetti-newsletter.
@@ -71,6 +80,9 @@ export default function createRoutes(deps: {
   db: Database;
   slug: string;
   projectRoot: string;
+  // Opzionale: il core la passa sempre, i test delle route dei contatti no.
+  // `null` significa core non disponibile, e le route che spediscono lo dicono.
+  mail?: MailMinima | null;
 }) {
   const r = new Hono();
   const db = deps.db;
@@ -198,6 +210,158 @@ export default function createRoutes(deps: {
   });
 
   r.get("/import", (c) => c.json({ righe: storicoImport(db) }));
+
+  /**
+   * Edizioni: ingestione, anteprima, prova, accodamento, avvio, stato.
+   *
+   * Accodare e avviare restano due route distinte perché è la semantica del
+   * core: fra l'una e l'altra la campagna è ferma in `queued` e non parte
+   * nulla. Fonderle in una toglierebbe l'unico momento in cui ci si può
+   * fermare.
+   */
+
+  const mail = deps.mail ?? null;
+
+  /** L'edizione o la risposta d'errore già pronta. */
+  function edizioneDaParam(c: { req: { param: (k: string) => string } }) {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id)) return null;
+    return leggiEdizione(db, id);
+  }
+
+  r.get("/edizioni", (c) => {
+    const stato = c.req.query("stato");
+    const filtri = stato ? { stato: stato as Stato } : {};
+    const { righe, totale } = elencaEdizioni(db, filtri);
+    // I corpi non servono all'elenco e sono grandi: si mandano nel dettaglio.
+    const leggere = righe.map(({ testo, html, ...resto }) => resto);
+    return c.json({ righe: leggere, totale });
+  });
+
+  r.post("/edizioni", async (c) => {
+    const body: { percorso?: string; ref?: string; oggetto?: string } =
+      await c.req.json().catch(() => ({}));
+    if (!body.percorso?.trim()) return c.json({ errore: "percorso_mancante" }, 400);
+    if (!body.ref?.trim()) return c.json({ errore: "ref_mancante" }, 400);
+    if (!body.oggetto?.trim()) return c.json({ errore: "oggetto_mancante" }, 400);
+
+    const esito = ingestaDaPercorso(db, {
+      percorso: body.percorso,
+      ref: body.ref,
+      oggetto: body.oggetto,
+    });
+    if (!esito.ok) {
+      const stato = esito.errore === "ref_gia_presente" ? 409 : 400;
+      return c.json({ errore: esito.errore }, stato);
+    }
+    return c.json(
+      { id: esito.id, ref: esito.ref, avvisoMailto: esito.avvisoMailto },
+      201,
+    );
+  });
+
+  r.get("/edizioni/:id", (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    return c.json(edizione);
+  });
+
+  r.get("/edizioni/:id/destinatari", (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    const tag = c.req.query("tag");
+    const righe = risolviDestinatari(db, tag ? { tag } : {});
+    return c.json({ righe, totale: righe.length });
+  });
+
+  r.post("/edizioni/:id/prova", async (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    const body: { a?: string } = await c.req.json().catch(() => ({}));
+    // `prova` controlla di nuovo e direbbe `indirizzo_non_valido`: qui il
+    // codice è più preciso perché distingue "non l'hai passato" da "non è
+    // utilizzabile". Il doppio controllo è voluto: il modulo resta valido
+    // anche se chiamato da altrove.
+    if (!body.a?.trim()) return c.json({ errore: "indirizzo_mancante" }, 400);
+
+    const esito = await prova(mail, edizione, body.a);
+    if (!esito.ok) {
+      const stato = esito.errore === "mail_non_disponibile" ? 503 : 400;
+      return c.json({ errore: esito.errore }, stato);
+    }
+    return c.json({ ok: true, id: esito.dato.id });
+  });
+
+  r.post("/edizioni/:id/accoda", async (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    if (edizione.stato !== "bozza") {
+      return c.json({ errore: "stato_non_accodabile", stato: edizione.stato }, 409);
+    }
+    const body: { tag?: string } = await c.req.json().catch(() => ({}));
+    const tag = body.tag?.trim() || null;
+
+    const destinatari = risolviDestinatari(db, tag ? { tag } : {});
+    const esito = await accoda(mail, edizione, destinatari);
+    if (!esito.ok) {
+      const stato =
+        esito.errore === "mail_non_disponibile"
+          ? 503
+          : esito.errore === "ref_gia_usato"
+            ? 409
+            : 400;
+      return c.json({ errore: esito.errore }, stato);
+    }
+
+    avanzaStato(db, edizione.id, "pronta", {
+      campagnaId: esito.dato.id,
+      filtroTag: tag,
+      destinatariN: destinatari.length,
+    });
+    return c.json({
+      ok: true,
+      campagnaId: esito.dato.id,
+      destinatari: destinatari.length,
+    });
+  });
+
+  r.post("/edizioni/:id/avvia", async (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    if (edizione.stato !== "pronta" || !edizione.campagnaId) {
+      return c.json({ errore: "stato_non_avviabile", stato: edizione.stato }, 409);
+    }
+
+    const esito = await avvia(mail, edizione.campagnaId);
+    if (!esito.ok) {
+      const stato = esito.errore === "mail_non_disponibile" ? 503 : 400;
+      return c.json({ errore: esito.errore }, stato);
+    }
+    avanzaStato(db, edizione.id, "in_invio");
+    return c.json({ ok: true });
+  });
+
+  r.get("/edizioni/:id/stato", async (c) => {
+    const edizione = edizioneDaParam(c);
+    if (!edizione) return c.json({ errore: "non_trovata" }, 404);
+    if (!edizione.campagnaId) {
+      return c.json({ errore: "mai_accodata", stato: edizione.stato }, 409);
+    }
+
+    const esito = await statoCampagna(mail, edizione.campagnaId);
+    if (!esito.ok) {
+      const stato = esito.errore === "mail_non_disponibile" ? 503 : 400;
+      return c.json({ errore: esito.errore }, stato);
+    }
+    if (!esito.dato) return c.json({ errore: "campagna_non_trovata" }, 404);
+
+    // Il core è la verità: se ha finito, l'edizione lo rispecchia.
+    const finita = esito.dato.status === "sent" || esito.dato.status === "sent_with_errors";
+    if (finita && edizione.stato === "in_invio") {
+      avanzaStato(db, edizione.id, "inviata");
+    }
+    return c.json(esito.dato);
+  });
 
   return r;
 }
