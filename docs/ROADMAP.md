@@ -151,7 +151,9 @@ qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
 
 ---
 
-## Fase 1.5 — Campagna diretta nel Core (Invio e Outreach anticipato)
+## Fase 1.5 — Campagna diretta nel Core (Invio e Outreach anticipato) ✅ (Completata)
+
+**Stato**: completata (2026-09-15)
 
 **Obiettivo**: iniziare a scrivere ai contatti e fare outreach subito, creando e avviando una campagna gestita direttamente dal trasporto del core, prima di completare l'ingestione formale e le validazioni (Fasi 2 e 3).
 
@@ -168,6 +170,25 @@ qualcuno, reimporti lo stesso file e il disiscritto resta disiscritto.
 **Perché adesso**: permette di iniziare immediatamente a coltivare i prospect e le relazioni reali mentre il lavoro architetturale sul plugin prosegue. Poiché è il core a governare il volume, la coda e i retry, non c'è rischio di violare limiti del provider né di causare disservizi.
 
 **Fatto quando**: a partire da una coppia `.txt` + `.html` e un oggetto, viene creata e avviata con successo una campagna nel core per i contatti iscritti, e il core restituisce lo stato di avanzamento.
+
+Spec: [superpowers/specs/2026-09-15-fase-1-5-campagna-diretta-design.md](superpowers/specs/2026-09-15-fase-1-5-campagna-diretta-design.md).
+Piano: [superpowers/plans/2026-09-15-fase-1-5-campagna-diretta.md](superpowers/plans/2026-09-15-fase-1-5-campagna-diretta.md).
+
+**Cosa lascia alle fasi successive**: la tabella `edizioni` con la macchina a
+stati, `server/destinatari.ts` e `server/campagne.ts` riusabili così come
+sono. Le Fasi 2 e 3 inseriscono `validata_tech` e `validata_semantica` fra
+`bozza` e `pronta`, senza rifare il percorso.
+
+**Una divergenza consapevole**: qui `pronta` significa «accodata nel core, in
+attesa di avvio», non «validata e accodabile» come nella roadmap originale.
+Senza validazioni uno stato intermedio sarebbe irraggiungibile. Le Fasi 2 e 3
+rimetteranno le cose a posto.
+
+**Nota sulla disiscrizione**: il link con token per destinatario richiede che
+il core supporti dati variabili per destinatario, cosa che oggi non fa
+(`mail-worker.ts` usa i corpi della campagna per tutti). Finché non c'è, la
+disiscrizione passa da un `mailto:` con oggetto precompilato, scritto
+dall'agente dei contenuti.
 
 ---
 

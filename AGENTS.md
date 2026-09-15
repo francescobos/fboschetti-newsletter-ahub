@@ -70,6 +70,10 @@ contratto è lo stesso, vedi la tabella sopra.
   `deps.coreBackups` nelle route e `bun run runs` / `bun run backups` da script.
 - Non esporre route proprie per lanciare run agente: le run le orchestra il core.
 - Non dichiarare le `deps` come `any`: i tipi stanno nei barrel `@hub/*`.
+- I corpi `testo` e `html` di un'edizione non si modificano mai: partono byte
+  per byte come sono stati consegnati. Il blocco di disiscrizione lo scrive
+  l'agente dei contenuti; il plugin verifica che ci sia e avvisa, non lo
+  aggiunge.
 
 ## Regole UI
 
@@ -108,16 +112,24 @@ Il dettaglio completo è in `route-db-ui.md`.
 
 ## Email e campagne
 
-Non ancora implementate: oggi il plugin non chiama né `mail.send` né le
-campagne. Quando si arriva all'invio, le tre cose da sapere subito:
+Implementate dalla Fase 1.5. Le route sotto `/edizioni` accodano e avviano le
+campagne via `deps.mail`; `server/campagne.ts` è l'unico punto che parla col
+servizio mail del core.
 
-Accodare **non** spedisce: serve `startCampaign`. Il `ref` della campagna è
-univoco per plugin ed è la protezione contro il doppio invio, quindi va
-derivato dal contenuto e **mai** da `Date.now()`. Il manifest dichiara già
-`"requiresHubApi": "^1.3"`, che è il minimo richiesto dalle campagne.
+Tre cose da sapere prima di toccarle:
 
-La CLI `mail campaign` passa dall'API HTTP dell'hub e oggi funziona solo con
-`AUTH_ENABLED=false`: in produzione le campagne vanno accodate da una route.
+Accodare **non** spedisce: `POST /edizioni/:id/accoda` crea la campagna ferma
+in `queued`, e solo `POST /edizioni/:id/avvia` la fa partire. Le due azioni
+restano separate di proposito.
+
+Il `ref` della campagna è univoco per plugin ed è la protezione contro il
+doppio invio: lo scrive l'utente, `normalizzaRef` lo riduce a `[a-z0-9-]`, e
+non deriva **mai** da `Date.now()`.
+
+`deps.mail` può essere `null`: le route che spediscono rispondono 503, mai in
+silenzio. Il tipo usato è `MailMinima` in `server/campagne.ts`, strutturale,
+perché `@hub/mail-api` non è risolvibile fuori dal core.
+
 Dettagli, stati e ripresa dopo riavvio in `email-e-campagne.md`.
 
 ## ⚠️ Il package.json e i comandi del core
