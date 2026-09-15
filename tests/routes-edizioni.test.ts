@@ -107,6 +107,23 @@ describe("GET /edizioni", () => {
     expect(corpo.righe[0].ref).toBe("newsletter-2026-09");
     expect(corpo.righe[0].testo).toBeUndefined();
   });
+
+  test("uno stato non valido è 400", async () => {
+    const res = await app.request("/edizioni?stato=inventato");
+    expect(res.status).toBe(400);
+    const corpo = await res.json();
+    expect(corpo.errore).toBe("stato_non_valido");
+    expect(corpo.attesi).toEqual(["bozza", "pronta", "in_invio", "inviata"]);
+  });
+
+  test("uno stato valido continua a filtrare", async () => {
+    await ingesta();
+    const res = await app.request("/edizioni?stato=bozza");
+    expect(res.status).toBe(200);
+    const corpo = await res.json();
+    expect(corpo.totale).toBe(1);
+    expect(corpo.righe[0].ref).toBe("newsletter-2026-09");
+  });
 });
 
 describe("GET /edizioni/:id", () => {

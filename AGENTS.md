@@ -130,6 +130,12 @@ non deriva **mai** da `Date.now()`.
 silenzio. Il tipo usato è `MailMinima` in `server/campagne.ts`, strutturale,
 perché `@hub/mail-api` non è risolvibile fuori dal core.
 
+Il manifest dichiara `"requiresHubApi": "^1.3"`, il minimo richiesto dalle
+campagne: non abbassarlo senza verificare che l'API del core esposta a questo
+plugin resti compatibile. La CLI `mail campaign` passa dall'API HTTP dell'hub
+e oggi funziona solo con `AUTH_ENABLED=false`: in produzione le campagne vanno
+accodate da una route, non lanciate da CLI.
+
 Dettagli, stati e ripresa dopo riavvio in `email-e-campagne.md`.
 
 ## ⚠️ Il package.json e i comandi del core

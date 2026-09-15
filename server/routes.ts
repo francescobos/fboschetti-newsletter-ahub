@@ -44,6 +44,7 @@ const STATI_VALIDI: StatoTecnico[] = [
   "rimbalzato",
   "sospeso",
 ];
+const STATI_EDIZIONE: Stato[] = ["bozza", "pronta", "in_invio", "inviata"];
 
 /** Corpo accettato da POST e PATCH: i dati del contatto più l'azienda per nome. */
 type CorpoContatto = Partial<DatiContatto> & { aziendaNome?: string | null };
@@ -231,6 +232,9 @@ export default function createRoutes(deps: {
 
   r.get("/edizioni", (c) => {
     const stato = c.req.query("stato");
+    if (stato && !STATI_EDIZIONE.includes(stato as Stato)) {
+      return c.json({ errore: "stato_non_valido", attesi: STATI_EDIZIONE }, 400);
+    }
     const filtri = stato ? { stato: stato as Stato } : {};
     const { righe, totale } = elencaEdizioni(db, filtri);
     // I corpi non servono all'elenco e sono grandi: si mandano nel dettaglio.
